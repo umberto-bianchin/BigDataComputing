@@ -42,7 +42,6 @@ def MRComputeFairObjective(inputPoints, C):
 
 # Function to print statistics (centroid, number of points in A and B)
 def MRPrintStatistics(inputPoints, C):
-    
     A = inputPoints.filter(lambda x: x[-1] == 'A')
     B = inputPoints.filter(lambda x: x[-1] == 'B')
 
@@ -73,12 +72,11 @@ def main():
     assert len(sys.argv) == 5, "Usage: python G97HW1.py <file_name> <L> <K> <M>"
     
     data_path = sys.argv[1]
-    assert os.path.isfile(data_path), "File or folder not found"
-
     L = sys.argv[2]
     K = sys.argv[3]
     M = sys.argv[4]
     
+    assert os.path.isfile(data_path), "File or folder not found"
     assert L.isdigit(), "L must be an integer"
     assert K.isdigit(), "K must be an integer"
     assert M.isdigit(), "M must be an integer"
