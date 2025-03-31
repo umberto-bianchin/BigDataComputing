@@ -9,7 +9,7 @@ import os
 def euclidean_distance(point1, point2):
     p1 = np.array(point1)
     p2 = np.array(point2)
-    return math.sqrt(sum((p1 - p2) ** 2))
+    return sum((p1 - p2) ** 2)
 
 # Function to find the closest centroid for a given point
 def closest_centroid(point, centroids):
@@ -58,7 +58,8 @@ def MRPrintStatistics(inputPoints, C):
         centroids_B[closest_centroid(point[0],C)] += 1
 
     for i, centroid in enumerate(C):
-        print(f"i = {i}, center = ({centroid}), NA{i} = {centroids_A[i]}, NB{i} = {centroids_B[i]}")
+        centroid_rounded = tuple(f"{coord:.6f}" for coord in centroid)
+        print(f"i = {i}, center = {centroid_rounded}, NA{i} = {centroids_A[i]}, NB{i} = {centroids_B[i]}")
 
 # Function to parse each line of the input file into a tuple (point, group)
 def parse_line(line):
