@@ -55,7 +55,7 @@ def MRPrintStatistics(inputPoints, C):
         centroids_B[closest_centroid(point[0],C)] += 1
 
     for i, centroid in enumerate(C):
-        print(f"({centroid}, {centroids_A[i]}, {centroids_B[i]})")
+        print(f"i = {i}, center = ({centroid}), NA{i} = {centroids_A[i]}, NB{i} = {centroids_B[i]}")
 
 # Function to parse each line of the input file into a tuple (point, group)
 def parse_line(line):
@@ -85,27 +85,25 @@ def main():
     K = int(K)
     M = int(M)
 
-    print(f"Command line arguments:\nInput file: {data_path}\nL:{L}\nK: {K}\nM: {M}")
+    print(f"Input file = {data_path}, L = {L}, K = {K}, M = {M}")
     
     #2 - Reads the input points into an RDD of (point,group) pairs subdivided into 𝐿 partitions.
-    conf = SparkConf().setAppName('WordCountExample')
+    conf = SparkConf().setAppName('G97HW1')
     sc = SparkContext(conf=conf)
     sc.setLogLevel("ERROR")
 
     inputPoints = sc.textFile(data_path).map(lambda line: parse_line(line)).repartition(numPartitions=L).cache()
 
     #3 - Prints the number 𝑁 of points, the number 𝑁𝐴 of points of group A, and the number 𝑁𝐵 of points of group B
-    print(f"Number of points (N): {inputPoints.count()}")
-    print(f"Number of points in group A (NA): {inputPoints.filter(lambda x: x[-1] == 'A').count()}")
-    print(f"Number of points in group B (NB): {inputPoints.filter(lambda x: x[-1] == 'B').count()}")
+    print(f"N = {inputPoints.count()}, NA = {inputPoints.filter(lambda x: x[-1] == 'A').count()}, NB = {inputPoints.filter(lambda x: x[-1] == 'B').count()}")
 
     #4 - Computes a set 𝐶 of 𝐾 centroids by using the Spark implementation of the standard Lloyd's algorithm for the input points using 𝑀 as number of iterations.
     data = inputPoints.map(lambda x: np.array(x[0]))
     model = KMeans.train(data, K, M)
     
     #5 - Prints the values of the two objective functions Δ(𝑈,𝐶) and Φ(𝐴,𝐵,𝐶)
-    print(f"{MRComputeStandardObjective(inputPoints, model.centers)}")
-    print(f"{MRComputeFairObjective(inputPoints, model.centers)}")
+    print(f"Delta(U,C) = {MRComputeStandardObjective(inputPoints, model.centers)}")
+    print(f"Phi(A,B,C) = {MRComputeFairObjective(inputPoints, model.centers)}")
 
     #6 - Runs MRPrintStatistics
     MRPrintStatistics(inputPoints, model.centers)
