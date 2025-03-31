@@ -7,7 +7,9 @@ import os
 
 # Function to calculate the Euclidean distance between two points
 def euclidean_distance(point1, point2):
-    return math.sqrt(sum((point1 - point2) ** 2))
+    p1 = np.array(point1)
+    p2 = np.array(point2)
+    return math.sqrt(sum((p1 - p2) ** 2))
 
 # Function to find the closest centroid for a given point
 def closest_centroid(point, centroids):
@@ -17,6 +19,7 @@ def closest_centroid(point, centroids):
 # Function to compute the standard objective function Δ(𝑈,𝐶)
 def MRComputeStandardObjective(inputPoints, C):
     distance = 0
+    
     for point in inputPoints.collect():
          distance += euclidean_distance(point[0], C[closest_centroid(point[0], C)])
 
