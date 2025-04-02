@@ -58,7 +58,8 @@ def MRPrintStatistics(inputPoints, C):
         centroids_B[closest_centroid(point[0],C)] += 1
 
     for i, centroid in enumerate(C):
-        centroid_rounded = tuple(f"{coord:.6f}" for coord in centroid)
+        tmp = [f"{coord:.6f}" for coord in centroid]
+        centroid_rounded = tuple(map(float, tmp))
         print(f"i = {i}, center = {centroid_rounded}, NA{i} = {centroids_A[i]}, NB{i} = {centroids_B[i]}")
 
 # Function to parse each line of the input file into a tuple (point, group)
