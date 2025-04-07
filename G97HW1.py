@@ -73,7 +73,7 @@ def MRComputeFairObjective(inputPoints, C):
 
     group_distances = inputPoints.map(lambda point_group: group_point_distance(point_group, bc_centroids))
     reduced = (group_distances.reduceByKey(lambda a, b: (a[0] + b[0], a[1] + b[1])).collectAsMap())
-    print(reduced)
+
     avg_A = reduced.get('A', (0, 1))
     avg_B = reduced.get('B', (0, 1))
 
