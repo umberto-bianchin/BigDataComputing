@@ -5,6 +5,10 @@ import math
 import sys
 import os
 
+# ======================================================
+#                  UTILITY FUNCTIONS
+# ======================================================
+
 # Function to calculate the Euclidean distance between two points
 def euclidean_distance(point1, point2):
     p1 = np.array(point1)
@@ -16,59 +20,85 @@ def closest_centroid(point, centroids):
     distances = [euclidean_distance(point, centroid) for centroid in centroids]
     return np.argmin(distances)
 
-# Function to compute the standard objective function Δ(𝑈,𝐶)
-def MRComputeStandardObjective(inputPoints, C):
-    distance = 0
-    
-    for point in inputPoints.collect():
-         distance += euclidean_distance(point[0], C[closest_centroid(point[0], C)])
-
-    obj_funct = (1/inputPoints.count()) * distance
-    return obj_funct
-
-# Function to compute the fairness objective function Φ(𝐴,𝐵,𝐶)
-def MRComputeFairObjective(inputPoints, C):
-    A = inputPoints.filter(lambda x: x[-1] == 'A')
-    B = inputPoints.filter(lambda x: x[-1] == 'B')
-
-    sum_A = 0
-    for point in A.collect():
-        sum_A += euclidean_distance(point[0], C[closest_centroid(point[0],C)])
-    
-    sum_B = 0
-    for point in B.collect():
-        sum_B += euclidean_distance(point[0], C[closest_centroid(point[0],C)])
-
-    obj_funct = max(1/A.count()*sum_A,1/B.count()*sum_B)
-
-    return obj_funct
-
-# Function to print statistics (centroid, number of points in A and B)
-def MRPrintStatistics(inputPoints, C):
-    A = inputPoints.filter(lambda x: x[-1] == 'A')
-    B = inputPoints.filter(lambda x: x[-1] == 'B')
-
-    centroids_A = np.zeros(len(C), int)
-    centroids_B = np.zeros(len(C), int)
-    
-    for point in A.collect():
-        centroids_A[closest_centroid(point[0],C)] += 1
-        
-    for point in B.collect():
-        centroids_B[closest_centroid(point[0],C)] += 1
-
-    for i, centroid in enumerate(C):
-        tmp = [f"{coord:.6f}" for coord in centroid]
-        centroid_rounded = tuple(map(float, tmp))
-        print(f"i = {i}, center = {centroid_rounded}, NA{i} = {centroids_A[i]}, NB{i} = {centroids_B[i]}")
-
 # Function to parse each line of the input file into a tuple (point, group)
 def parse_line(line):
-    values = line.split(',')
+    values = line.strip().split(',')
     point = tuple(map(float, values[:-1]))
     group = values[-1]
 
     return (point, group)
+
+# ======================================================
+#             DISTANCE MAPPING FUNCTIONS
+# ======================================================
+
+# For MRComputeStandardObjective: point to distance
+def point_distance(point_group, bc_centroids):
+        point = point_group[0]
+        centroids = bc_centroids.value
+        closest = closest_centroid(point, centroids)
+        return euclidean_distance(point, centroids[closest])
+
+# For MRComputeFairObjective: point to (group, (distance, 1))
+def group_point_distance(point_group, bc_centroids):
+        point, group = point_group
+        centroids = bc_centroids.value
+        closest = closest_centroid(point, centroids)
+        dist = euclidean_distance(point, centroids[closest])
+        return (group, (dist, 1))
+
+# For MRPrintStatistics: point to ((centroid_idx, group), 1)
+def map_to_centroid_group(point_group, bc_centroids):
+        point, group = point_group
+        centroids = bc_centroids.value
+        idx = closest_centroid(point, centroids)
+        return ((idx, group), 1)
+
+# ======================================================
+#               OBJECTIVE FUNCTIONS
+# ======================================================
+
+# Function to compute the standard objective function Δ(𝑈,𝐶)
+def MRComputeStandardObjective(inputPoints, C):
+    bc_centroids = inputPoints.context.broadcast(C)
+
+    total_distance = inputPoints.map(lambda point_group: point_distance(point_group, bc_centroids)).sum()
+
+    obj_funct = total_distance / inputPoints.count()
+    return obj_funct
+
+# Function to compute the fairness objective function Φ(𝐴,𝐵,𝐶)
+def MRComputeFairObjective(inputPoints, C):
+    bc_centroids = inputPoints.context.broadcast(C)
+
+    group_distances = inputPoints.map(lambda point_group: group_point_distance(point_group, bc_centroids))
+    reduced = (group_distances.reduceByKey(lambda a, b: (a[0] + b[0], a[1] + b[1])).collectAsMap())
+    print(reduced)
+    avg_A = reduced.get('A', (0, 1))
+    avg_B = reduced.get('B', (0, 1))
+
+    obj_funct = max(avg_A[0] / avg_A[1], avg_B[0] / avg_B[1])
+
+    return obj_funct
+
+# ======================================================
+#            STATISTICS REPORTING FUNCTION
+# ======================================================
+
+# Function to print statistics (centroid, number of points in A and B)
+def MRPrintStatistics(inputPoints, C):
+    bc_centroids = inputPoints.context.broadcast(C)
+
+    counts = (inputPoints.map(lambda point_group: map_to_centroid_group(point_group, bc_centroids)).reduceByKey(lambda x, y: x + y)
+              .map(lambda x: (x[0][0], (x[0][1], x[1]))).groupByKey().mapValues(dict))
+    
+    counts_map = dict(counts.collect())
+    for i, center in enumerate(C):
+        counts_dict = counts_map.get(i, {})
+        NA = counts_dict.get('A', 0)
+        NB = counts_dict.get('B', 0)
+        formatted_center = ", ".join(f"{coord:.6f}" for coord in center)
+        print(f"i = {i}, center = ({formatted_center}), NA{i} = {NA}, NB{i} = {NB}")
 
 
 def main():
@@ -85,10 +115,8 @@ def main():
     assert L.isdigit(), "L must be an integer"
     assert K.isdigit(), "K must be an integer"
     assert M.isdigit(), "M must be an integer"
-       
-    L = int(L)
-    K = int(K)
-    M = int(M)
+    
+    L, K, M = map(int, (L, K, M))
 
     print(f"Input file = {data_path}, L = {L}, K = {K}, M = {M}")
     
@@ -100,7 +128,11 @@ def main():
     inputPoints = sc.textFile(data_path).map(lambda line: parse_line(line)).repartition(numPartitions=L).cache()
 
     #3 - Prints the number 𝑁 of points, the number 𝑁𝐴 of points of group A, and the number 𝑁𝐵 of points of group B
-    print(f"N = {inputPoints.count()}, NA = {inputPoints.filter(lambda x: x[-1] == 'A').count()}, NB = {inputPoints.filter(lambda x: x[-1] == 'B').count()}")
+    NA = inputPoints.filter(lambda x: x[-1] == 'A').count()
+    NB = inputPoints.filter(lambda x: x[-1] == 'B').count()
+    N = NA + NB
+
+    print(f"N = {N}, NA = {NA}, NB = {NB}")
 
     #4 - Computes a set 𝐶 of 𝐾 centroids by using the Spark implementation of the standard Lloyd's algorithm for the input points using 𝑀 as number of iterations.
     data = inputPoints.map(lambda x: np.array(x[0]))
@@ -112,6 +144,8 @@ def main():
 
     #6 - Runs MRPrintStatistics
     MRPrintStatistics(inputPoints, model.centers)
+
+    sc.stop()
 
 if __name__ == "__main__":
 	main()
