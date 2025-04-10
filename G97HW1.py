@@ -97,7 +97,7 @@ def MRPrintStatistics(inputPoints, C):
         counts_dict = counts_map.get(i, {})
         NA = counts_dict.get('A', 0)
         NB = counts_dict.get('B', 0)
-        formatted_center = ", ".join(f"{coord:.6f}" for coord in center)
+        formatted_center = ",".join(f"{coord:.6f}" for coord in center)
         print(f"i = {i}, center = ({formatted_center}), NA{i} = {NA}, NB{i} = {NB}")
 
 
@@ -122,6 +122,7 @@ def main():
     
     #2 - Reads the input points into an RDD of (point,group) pairs subdivided into 𝐿 partitions.
     conf = SparkConf().setAppName('G97HW1')
+    conf.set("spark.driver.bindAddress", "127.0.0.1")
     sc = SparkContext(conf=conf)
     sc.setLogLevel("ERROR")
 
@@ -139,8 +140,14 @@ def main():
     model = KMeans.train(data, K, M)
     
     #5 - Prints the values of the two objective functions Δ(𝑈,𝐶) and Φ(𝐴,𝐵,𝐶)
-    print(f"Delta(U,C) = {MRComputeStandardObjective(inputPoints, model.centers)}")
-    print(f"Phi(A,B,C) = {MRComputeFairObjective(inputPoints, model.centers)}")
+    delta = MRComputeStandardObjective(inputPoints, model.centers)
+    phi = MRComputeFairObjective(inputPoints, model.centers)
+    
+    formatted_delta = f"{delta:.6f}"
+    formatted_phi = f"{phi:.6f}"
+
+    print(f"Delta(U,C) = {formatted_delta}")
+    print(f"Phi(A,B,C) = {formatted_phi}")
 
     #6 - Runs MRPrintStatistics
     MRPrintStatistics(inputPoints, model.centers)
