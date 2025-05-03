@@ -202,7 +202,7 @@ def main():
     K = sys.argv[3]
     M = sys.argv[4]
     
-    assert os.path.isfile(data_path), "File or folder not found"
+    #assert os.path.isfile(data_path), "File or folder not found"
     assert L.isdigit(), "L must be an integer"
     assert K.isdigit(), "K must be an integer"
     assert M.isdigit(), "M must be an integer"
