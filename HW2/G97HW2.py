@@ -28,11 +28,17 @@ def parse_line(line):
 
     return (point, group)
 
+
+# ======================================================
+#            VECTOR AND CENTROID COMPUTATION
+# ======================================================
+
 def compute_vectors(stats, NA, NB, C, K):
     alpha, betha = [], []
     mu_A, mu_B, l = [], [], []
 
     for i in range(K):
+        # Retrieve sum and count for group A in cluster i, default (zero_vec,0)
         sumA, cntA = stats.get((i, 'A'), (np.zeros_like(C[0]), 0))
         sumB, cntB = stats.get((i, 'B'), (np.zeros_like(C[0]), 0))
 
@@ -85,7 +91,7 @@ def centroid_selection(inputPoints, stats, NA, NB, C, K):
     bcMuA = inputPoints.context.broadcast({i:mu_A[i] for i in range(K)})
     bcMuB = inputPoints.context.broadcast({i:mu_B[i] for i in range(K)})
 
-    #(gruppo, (distanza ^2, 1))
+    # helper function: map each point to (group, (distance^2,1)) to its group‐centroid
     def obj_pair(pg):
         pt, g = pg
         i = closest_centroid(pt, C)
@@ -108,7 +114,6 @@ def centroid_selection(inputPoints, stats, NA, NB, C, K):
     
     newC = []
     for i in range(K):
-        
         if l[i] > 0:
             ci = ((l[i]-x[i])*mu_A[i]+x[i]*mu_B[i])/l[i]
         else:
@@ -152,6 +157,7 @@ def MRComputeFairObjective(inputPoints, C):
 
 # Function to compute the fairness Lloyd's algorithm
 def MRFairLloyd(inputPoints, K, M):
+    # Initialize centroids via kmeans (0 iterations)
     data = inputPoints.map(lambda x: np.array(x[0]))
     model = KMeans.train(data, K, 0)
     C = model.centers
@@ -165,6 +171,7 @@ def MRFairLloyd(inputPoints, K, M):
         bcC = inputPoints.context.broadcast(C)
 
         #2.1 - Partition U into k clusters U1,U2,...,Uk where Ui consists of the points of U whose closest current centroid is ci
+        #stats: dict mapping (cluster_idx, group) -> (sum_of_points, count_of_points)
         stats = (
             inputPoints
             .map(lambda x: (
@@ -173,8 +180,8 @@ def MRFairLloyd(inputPoints, K, M):
             ))
             .aggregateByKey(
                 (np.zeros_like(C[0]), 0),
-                lambda acc, val: (acc[0] + val[0], acc[1] + val[1]),    #for each key sum the vector and increment the counter
-                lambda a, b: (a[0] + b[0], a[1] + b[1])                 #out togheter results from different partitions
+                lambda acc, val: (acc[0] + val[0], acc[1] + val[1]),    # for each key sum the vector and increment the counter
+                lambda a, b: (a[0] + b[0], a[1] + b[1])                 # put togheter results from different partitions
             )
             .collectAsMap()
         )
