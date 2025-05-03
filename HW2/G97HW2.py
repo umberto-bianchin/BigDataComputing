@@ -45,7 +45,7 @@ def compute_vectors(stats, NA, NB, C, K):
         alpha_i = cntA / NA if NA > 0 else 0.0
         betha_i= cntB / NB if NB > 0 else 0.0
 
-        mu_A_i = sumA / cntA if cntA > 0 else np.zeros(C[0])
+        mu_A_i = sumA / cntA if cntA > 0 else np.zeros_like(C[0])
         mu_B_i = sumB / cntB if cntB > 0 else np.zeros_like(C[0])
 
         alpha.append(alpha_i)
