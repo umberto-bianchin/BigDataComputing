@@ -57,32 +57,30 @@ def compute_vectors(stats, NA, NB, C, K):
         l.append(float(np.linalg.norm(mu_A_i - mu_B_i)))
     return alpha, betha, mu_A, mu_B, l
 
-def computeVectorX(fixedA, fixedB, alpha, betha, l, K, T=10):
+def computeVectorX(fixed_a, fixed_b, alpha, beta, ell, k):
     gamma = 0.5
-    x = [0.0 for i in range(K)]
-    
-    for t in range(T):
-        f_A = fixedA
-        f_B = fixedB
-        for i in range(K):
-            denom = gamma * alpha[i] + (1 - gamma) * betha[i]
-            if(denom > 0):
-                x[i] = ((1 - gamma) * betha[i] * l[i]) / denom
-            else:
-                x[i] = 0.0
+    x_dist = [0.0] * k
+    power = 0.5
+    t_max = 10
 
-            f_A += alpha[i] * x[i] **2
-            f_B += betha[i] * (l[i] - x[i]) **2
-            
-        if f_A == f_B:
-             break
-        else:
-            if f_A > f_B:
-                gamma += (0.5) **(t+1)
-            else:
-                gamma -= (0.5) **(t+1)
+    for _ in range(t_max):
+        f_a = fixed_a
+        f_b = fixed_b
+        power /= 2
 
-    return x
+        for i in range(k):
+            temp = (1 - gamma) * beta[i] * ell[i] / (gamma * alpha[i] + (1 - gamma) * beta[i])
+            x_dist[i] = temp
+            f_a += alpha[i] * temp * temp
+            temp = ell[i] - temp
+            f_b += beta[i] * temp * temp
+
+        if f_a == f_b:
+            break
+
+        gamma = gamma + power if f_a > f_b else gamma - power
+
+    return x_dist
 
 def centroid_selection(inputPoints, stats, NA, NB, C, K):
     alpha, betha, mu_A, mu_B, l = compute_vectors(stats, NA, NB, C,K)
