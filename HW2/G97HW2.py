@@ -28,34 +28,59 @@ def parse_line(line):
 
     return (point, group)
 
+# Function to map a point to its closest centroid, collecting separate stats for groups A and B
+def map_stats(point_group, centroids):
+    pt, g = np.array(point_group[0]), point_group[1]
+    idx = closest_centroid(pt, centroids)
+    # If group A: return (ptA, sumSqA, countA, zeroB, zeroSqB, zeroCountB)
+    if g == 'A':
+        return idx, (pt, np.dot(pt, pt), 1, np.zeros_like(pt), 0.0, 0)
+    # If group B: return (zeroA, zeroSqA, zeroCountA, ptB, sumSqB, countB)
+    else:
+        return idx, (np.zeros_like(pt), 0.0, 0, pt, np.dot(pt, pt), 1)
+
+# Function to reduce two tuples by element-wise summation
+def reduce_stats(a, b):
+    return tuple(a[i] + b[i] for i in range(6))
+
 
 # ======================================================
 #            VECTOR AND CENTROID COMPUTATION
 # ======================================================
 
+# Given stats for each cluster i: stats[i] = (sumA, sumSqA, cntA, sumB, sumSqB, cntB)
+# Compute all the needed vectors
 def compute_vectors(stats, NA, NB, C, K):
-    alpha, betha = [], []
-    mu_A, mu_B, l = [], [], []
+    alpha = [0.0] * K
+    beta = [0.0] * K
+    muA = [None] * K
+    muB = [None] * K
+    ell = [0.0] * K
+    deltaA = 0.0
+    deltaB = 0.0
 
     for i in range(K):
-        # Retrieve sum and count for group A in cluster i, default (zero_vec,0)
-        sumA, cntA = stats.get((i, 'A'), (np.zeros_like(C[0]), 0))
-        sumB, cntB = stats.get((i, 'B'), (np.zeros_like(C[0]), 0))
+        # Retrieve sum and count for group A and B, default zeros
+        sumA, sqA, cntA, sumB, sqB, cntB = stats.get(i, (np.zeros_like(C[0]), 0.0, 0, np.zeros_like(C[0]), 0.0, 0))
 
         alpha_i = cntA / NA if NA > 0 else 0.0
         betha_i= cntB / NB if NB > 0 else 0.0
 
-        mu_A_i = sumA / cntA if cntA > 0 else np.zeros_like(C[0])
-        mu_B_i = sumB / cntB if cntB > 0 else np.zeros_like(C[0])
+        mu_A_i = sumA / cntA if cntA > 0 else C[i]
+        mu_B_i = sumB / cntB if cntB > 0 else C[i]
 
-        alpha.append(alpha_i)
-        betha.append(betha_i)
+        alpha[i] = alpha_i
+        beta[i] = betha_i
         
-        mu_A.append(mu_A_i)
-        mu_B.append(mu_B_i)
+        muA[i] = mu_A_i
+        muB[i] = mu_B_i
+
+        deltaA += sqA - cntA * np.dot(mu_A_i, mu_A_i)
+        deltaB += sqB - cntB * np.dot(mu_B_i, mu_B_i)
         
-        l.append(float(np.linalg.norm(mu_A_i - mu_B_i)))
-    return alpha, betha, mu_A, mu_B, l
+        ell[i] = float(np.linalg.norm(mu_A_i - mu_B_i))
+
+    return alpha, beta, muA, muB, ell, deltaA, deltaB
 
 def computeVectorX(fixed_a, fixed_b, alpha, beta, ell, k):
     gamma = 0.5
@@ -82,40 +107,21 @@ def computeVectorX(fixed_a, fixed_b, alpha, beta, ell, k):
 
     return x_dist
 
-def centroid_selection(inputPoints, stats, NA, NB, C, K):
-    alpha, betha, mu_A, mu_B, l = compute_vectors(stats, NA, NB, C,K)
+# Function to compute new fair centroids for all clusters
+def centroid_selection(stats, NA, NB, C, K):
+    alpha, betha, mu_A, mu_B, ell, deltaA, deltaB = compute_vectors(stats, NA, NB, C, K)
 
+    fixedA = deltaA / NA
+    fixedB = deltaB / NB
 
-    bcMuA = inputPoints.context.broadcast({i:mu_A[i] for i in range(K)})
-    bcMuB = inputPoints.context.broadcast({i:mu_B[i] for i in range(K)})
-
-    # helper function: map each point to (group, (distance^2,1)) to its group‐centroid
-    def obj_pair(pg):
-        pt, g = pg
-        i = closest_centroid(pt, C)
-        mu = bcMuA.value[i] if g=='A' else bcMuB.value[i]
-        d2 = float(((np.array(pt) - mu)**2).sum())
-        return (g, (d2, 1))
-
-    reduced = (inputPoints
-                .map(obj_pair)
-                .reduceByKey(lambda a, b: (a[0]+b[0], a[1]+b[1]))
-                .collectAsMap())
-
-    fixedA = (reduced.get('A', (0.0,1))[0] / NA) if NA > 0 else 0.0
-    fixedB = (reduced.get('B', (0.0,1))[0] / NB) if NB > 0 else 0.0
-    
-    bcMuA.unpersist()
-    bcMuB.unpersist()
-
-    x = computeVectorX(fixedA, fixedB, alpha, betha, l, K)
+    x = computeVectorX(fixedA, fixedB, alpha, betha, ell, K)
     
     newC = []
     for i in range(K):
-        if l[i] > 0:
-            ci = ((l[i]-x[i])*mu_A[i]+x[i]*mu_B[i])/l[i]
+        if ell[i] > 0:
+            ci = ((ell[i] - x[i]) * mu_A[i] + x[i] * mu_B[i]) / ell[i]
         else:
-            ci = mu_A[i] # mu_A[i] == mu_B[i]
+            ci = C[i]
 
         newC.append(ci)
 
@@ -152,8 +158,8 @@ def MRComputeFairObjective(inputPoints, C):
     obj_funct = max(avg_A[0] / avg_A[1], avg_B[0] / avg_B[1])
 
     return obj_funct
-
-# Function to compute the fairness Lloyd's algorithm
+    
+# Function to compute the fair Lloyd's algorithm
 def MRFairLloyd(inputPoints, K, M):
     # Initialize centroids via kmeans (0 iterations)
     data = inputPoints.map(lambda x: np.array(x[0]))
@@ -166,27 +172,20 @@ def MRFairLloyd(inputPoints, K, M):
 
     for _ in range(M):
         # Broadcast current C
-        bcC = inputPoints.context.broadcast(C)
+        bc_cent = inputPoints.context.broadcast(C)
 
         #2.1 - Partition U into k clusters U1,U2,...,Uk where Ui consists of the points of U whose closest current centroid is ci
-        #stats: dict mapping (cluster_idx, group) -> (sum_of_points, count_of_points)
+        #stats: dict mapping cluster_idx -> (sumA, sumSqA, cntA, sumB, sumSqB, cntB)
         stats = (
             inputPoints
-            .map(lambda x: (
-                (closest_centroid(x[0], bcC.value), x[1]),  #key = (closest_centroid, group)
-                (np.array(x[0]), 1)                         #value = (point, 1)
-            ))
-            .aggregateByKey(
-                (np.zeros_like(C[0]), 0),
-                lambda acc, val: (acc[0] + val[0], acc[1] + val[1]),    # for each key sum the vector and increment the counter
-                lambda a, b: (a[0] + b[0], a[1] + b[1])                 # put togheter results from different partitions
-            )
+            .map(lambda x: map_stats(x, bc_cent.value))
+            .reduceByKey(reduce_stats)
             .collectAsMap()
         )
-        bcC.unpersist()
+        bc_cent.destroy()
 
         #2.2 - Compute a new set {c1, ..., ck} of K centroids
-        C = centroid_selection(inputPoints, stats, NA, NB, C, K)
+        C = centroid_selection(stats, NA, NB, C, K)
 
     return [tuple(c.tolist()) for c in C]
 
@@ -211,7 +210,6 @@ def main():
     
     #2 - Reads the input points into an RDD of (point,group) pairs subdivided into 𝐿 partitions.
     conf = SparkConf().setAppName('G97HW2')
-    #conf.set("spark.driver.bindAddress", "127.0.0.1")
     sc = SparkContext(conf=conf)
     sc.setLogLevel("ERROR")
 
