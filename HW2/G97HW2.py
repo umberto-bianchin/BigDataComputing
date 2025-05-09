@@ -225,24 +225,24 @@ def main():
     start = time.perf_counter()
     model = KMeans.train(data, K, M)
     end = time.perf_counter()
-    time_C_stand = f"{(end - start)*100:.0f}"
+    time_C_stand = f"{(end - start)*1000:.0f}"
     
     #5 - Computes a set 𝐶fair of 𝐾 centroids by running MRFairLloyd(inputPoints,K,M).
     start = time.perf_counter()
     C = MRFairLloyd(inputPoints, K, M)
     end = time.perf_counter()
-    time_C_fair = f"{(end - start)*100:.0f}"
+    time_C_fair = f"{(end - start)*1000:.0f}"
 
     #5 - Computes and prints Φ(𝐴,𝐵,𝐶stand) and Φ(𝐴,𝐵,𝐶fair)
     start = time.perf_counter()
     phiStand = MRComputeFairObjective(inputPoints, model.centers)
     end = time.perf_counter()
-    time_Phi_stand = f"{(end - start)*100:.0f}"
+    time_Phi_stand = f"{(end - start)*1000:.0f}"
 
     start = time.perf_counter()
     phiFair = MRComputeFairObjective(inputPoints, C)
     end = time.perf_counter()
-    time_Phi_fair = f"{(end - start)*100:.0f}"
+    time_Phi_fair = f"{(end - start)*1000:.0f}"
 
     formatted_phi_stand = f"{phiStand:.4f}"
     formatted_phi_fair = f"{phiFair:.4f}"
