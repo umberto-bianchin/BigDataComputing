@@ -229,36 +229,36 @@ def main():
     start = time.perf_counter()
     model = KMeans.train(data, K, M)
     end = time.perf_counter()
-    time_C_stand = f"{end - start:.4f}"
+    time_C_stand = f"{(end - start)*100:.0f}"
     
     #5 - Computes a set 𝐶fair of 𝐾 centroids by running MRFairLloyd(inputPoints,K,M).
     start = time.perf_counter()
     C = MRFairLloyd(inputPoints, K, M)
     end = time.perf_counter()
-    time_C_fair = f"{end- start:.4f}"
+    time_C_fair = f"{(end - start)*100:.0f}"
 
     #5 - Computes and prints Φ(𝐴,𝐵,𝐶stand) and Φ(𝐴,𝐵,𝐶fair)
     start = time.perf_counter()
     phiStand = MRComputeFairObjective(inputPoints, model.centers)
     end = time.perf_counter()
-    time_Phi_stand = f"{end - start:.4f}"
+    time_Phi_stand = f"{(end - start)*100:.0f}"
 
     start = time.perf_counter()
     phiFair = MRComputeFairObjective(inputPoints, C)
     end = time.perf_counter()
-    time_Phi_fair = f"{end- start:.4f}"
+    time_Phi_fair = f"{(end - start)*100:.0f}"
 
-    formatted_phi_stand = f"{phiStand:.6f}"
-    formatted_phi_fair = f"{phiFair:.6f}"
+    formatted_phi_stand = f"{phiStand:.4f}"
+    formatted_phi_fair = f"{phiFair:.4f}"
 
-    print(f"Phi(A,B,Cstand) = {formatted_phi_stand}")
-    print(f"Phi(A,B,Cfair) = {formatted_phi_fair}")    
+    print(f"Fair Objective with Standard Centers = {formatted_phi_stand}")
+    print(f"Fair Objective with Fair Centers = {formatted_phi_fair}")    
 
     #6 - Prints separately the times, in seconds, spent to compute : 𝐶stand, 𝐶fair, Φ(𝐴,𝐵,𝐶stand) and Φ(𝐴,𝐵,𝐶fair).
-    print(f"Time C stand   = {time_C_stand} s")    
-    print(f"Time C fair    = {time_C_fair} s")    
-    print(f"Time Phi stand = {time_Phi_stand} s")    
-    print(f"Time Phi fair  = {time_Phi_fair} s")    
+    print(f"Time to compute standard centers = {time_C_stand} ms")    
+    print(f"Time to compute fair centers = {time_C_fair} ms")    
+    print(f"Time to compute objective with standard centers = {time_Phi_stand} ms")    
+    print(f"Time to compute objective with fair centers = {time_Phi_fair} ms")    
     
     sc.stop()
 
