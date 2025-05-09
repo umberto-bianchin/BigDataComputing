@@ -1,65 +1,76 @@
 # G97GEN.py
 import sys
+import math
 import random
-import os
 import csv
+import os
+
 '''
-The script G97GEN.py generates a synthetic dataset of NN two-dimensional points with demographic labels (A or B), designed to highlight the difference in clustering quality between standard Lloyd's algorithm and its fair variant. The generator creates KK spatial clusters within the approximate NYC area. Each cluster is biased toward one demographic group, alternating between A-majority and B-majority clusters (with a 90%-10% distribution). This deliberate imbalance ensures that standard clustering may group similar points but fail to respect demographic fairness, while the fair variant should yield more balanced groupings. The output is saved in CSV format and can be directly used as input for clustering algorithms.
+The script G97GEN.py generates a synthetic 2D dataset of N points with demographic labels (A or B).
+The dataset is structured to highlight the quality gap between standard Lloyd's algorithm and its fair variant.
+It creates K-1 compact clusters for the majority group A, and a single wide-spread cluster for the minority group B.
+Points are printed and saved in CSV format (datasets/G97GEN.csv).
 '''
-def generate_cluster(center_lat, center_lon, radius, num_points, group_ratio):
-    points = []
-    for _ in range(num_points):
-        lat = round(random.uniform(center_lat - radius, center_lat + radius), 6)
-        lon = round(random.uniform(center_lon - radius, center_lon + radius), 6)
-        label = random.choices(['A', 'B'], weights=group_ratio)[0]
-        points.append((lat, lon, label))
-    return points
+
+def gen_dataset(N, K):
+    output_file = os.path.join("datasets", "G97GEN.csv")
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+
+    beta = 0.1       # fraction of minority group B
+    R = 50.0         # radius for arranging A clusters
+    sigma_A = 1.0    # spread for A clusters
+    sigma_B = 15.0   # spread for single B cluster
+
+    N_B = max(1, int(beta * N))
+    N_A = N - N_B
+    A_per_cluster, remainder = divmod(N_A, K - 1)
+
+    dataset = []
+
+    # Generate B points (minority group, one loose cluster)
+    dataset.extend(
+        [[f"{random.gauss(0, sigma_B):.4f}", f"{random.gauss(0, sigma_B):.4f}", "B"]
+         for _ in range(N_B)]
+    )
+
+
+    # Generate (K-1) clusters for A
+    for i, angle in enumerate(math.tau * j / (K - 1) for j in range(K - 1)):
+        cx, cy = R * math.cos(angle), R * math.sin(angle)
+        num_points = A_per_cluster + (i < remainder)
+        dataset.extend(
+            [ [f"{random.gauss(cx, sigma_A):.4f}", f"{random.gauss(cy, sigma_A):.4f}", "A"] 
+              for _ in range(num_points) ]
+        )
+
+
+    # Shuffle and write to file and console
+    random.shuffle(dataset)
+    with open(output_file, 'w', newline='') as csvfile:
+        writer = csv.writer(csvfile)
+        for point in dataset:
+            writer.writerow(point)
+            print(point)
+
+    print(f"Saved {len(dataset)} points to {output_file}")
 
 def main():
+
     if len(sys.argv) != 3:
         print("Usage: python G97GEN.py N K")
         sys.exit(1)
 
-    N = int(sys.argv[1])
-    K = int(sys.argv[2])
-    points_per_cluster = N // K
-    remaining = N % K
+    try:
+        N = int(sys.argv[1])
+        K = int(sys.argv[2])
+        if K < 2:
+            raise ValueError
+    except ValueError:
+        print("N must be an integer, and K must be an integer ≥ 2.")
+        sys.exit(1)
 
-    # NYC-area cluster centers
-    cluster_centers = [
-        (40.75, -73.99),
-        (40.72, -74.00),
-        (40.78, -73.97),
-        (40.69, -74.01),
-        (40.80, -73.95)
-    ]
-    random.shuffle(cluster_centers)
 
-    while len(cluster_centers) < K:
-        base = random.choice(cluster_centers)
-        perturb = (random.uniform(-0.005, 0.005), random.uniform(-0.005, 0.005))
-        cluster_centers.append((base[0] + perturb[0], base[1] + perturb[1]))
-
-    dataset = []
-    for i in range(K):
-        center = cluster_centers[i]
-        group_ratio = [0.98, 0.02] if i % 2 == 0 else [0.02, 0.98]
-        count = points_per_cluster + (1 if i < remaining else 0)
-        cluster_points = generate_cluster(center[0], center[1], radius=0.01, num_points=count, group_ratio=group_ratio)
-        dataset.extend(cluster_points)
-
-    # Shuffle and save to CSV
-    random.shuffle(dataset)
-    output_path = os.path.join("datasets", "G97GEN.csv")
-    os.makedirs(os.path.dirname(output_path), exist_ok=True)
-
-    with open(output_path, mode='w', newline='') as csvfile:
-        writer = csv.writer(csvfile)
-        for lat, lon, label in dataset:
-            writer.writerow([lat, lon, label])
-            print([lat, lon, label])
-
-    print(f"Saved {len(dataset)} points to {output_path}")
+    gen_dataset(N, K)
 
 if __name__ == "__main__":
     main()
