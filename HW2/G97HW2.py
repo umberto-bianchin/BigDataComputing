@@ -206,8 +206,6 @@ def main():
     
     L, K, M = map(int, (L, K, M))
 
-    print(f"Input file = {data_path}, L = {L}, K = {K}, M = {M}")
-    
     #2 - Reads the input points into an RDD of (point,group) pairs subdivided into 𝐿 partitions.
     conf = SparkConf().setAppName('G97HW2')
     sc = SparkContext(conf=conf)
@@ -220,8 +218,6 @@ def main():
     NA = inputPoints.filter(lambda x: x[-1] == 'A').count()
     NB = inputPoints.filter(lambda x: x[-1] == 'B').count()
     N = NA + NB
-
-    print(f"N = {N}, NA = {NA}, NB = {NB}")
 
     #4 - Computes a set 𝐶stand of 𝐾 centroids for the input points, by running the Spark implementation of the standard Lloyd's algorithm, with 𝑀 iterations, disregarding the demographic groups.
     data = inputPoints.map(lambda x: np.array(x[0]))
@@ -250,6 +246,9 @@ def main():
 
     formatted_phi_stand = f"{phiStand:.4f}"
     formatted_phi_fair = f"{phiFair:.4f}"
+
+    print(f"Input file = {data_path}, L = {L}, K = {K}, M = {M}")
+    print(f"N = {N}, NA = {NA}, NB = {NB}")
 
     print(f"Fair Objective with Standard Centers = {formatted_phi_stand}")
     print(f"Fair Objective with Fair Centers = {formatted_phi_fair}")    
