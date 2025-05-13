@@ -16,12 +16,10 @@ def gen_dataset(N, K):
     output_file = os.path.join("datasets", "G97GEN.csv")
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
 
-    beta = 0.1       # fraction of minority group B
-    R = 50.0         # radius for arranging A clusters
     sigma_A = 1.0    # spread for A clusters
     sigma_B = 15.0   # spread for single B cluster
 
-    N_B = max(1, int(beta * N))
+    N_B = max(1, int(0.1 * N)) #betha = 0.1
     N_A = N - N_B
     A_per_cluster, remainder = divmod(N_A, K - 1)
 
@@ -36,7 +34,7 @@ def gen_dataset(N, K):
 
     # Generate (K-1) clusters for A
     for i, angle in enumerate(math.tau * j / (K - 1) for j in range(K - 1)):
-        cx, cy = R * math.cos(angle), R * math.sin(angle)
+        cx, cy = 50 * math.cos(angle), 50 * math.sin(angle) #radius = 50
         num_points = A_per_cluster + (i < remainder)
         dataset.extend(
             [ [f"{random.gauss(cx, sigma_A):.4f}", f"{random.gauss(cy, sigma_A):.4f}", "A"] 

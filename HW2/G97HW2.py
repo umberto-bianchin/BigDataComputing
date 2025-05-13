@@ -58,34 +58,25 @@ def compute_vectors(stats, NA, NB, C, K):
     ell = [0.0] * K
     deltaA = 0.0
     deltaB = 0.0
-    
-    C_squares = [np.dot(c, c) for c in C]
 
     for i in range(K):
         # Retrieve sum and count for group A and B, default zeros
-        #sumA, sqA, cntA, sumB, sqB, cntB = stats.get(i, (np.zeros_like(C[0]), 0.0, 0, np.zeros_like(C[0]), 0.0, 0))
-        sumA, sqA, cntA, sumB, sqB, cntB = stats[i]
-        '''
-        vals = stats.lookup(i)
-        if vals:
-            sumA, sqA, cntA, sumB, sqB, cntB = vals[0]
-        else:
-            sumA, sqA, cntA, sumB, sqB, cntB = np.zeros_like(C[0]), 0.0, 0, np.zeros_like(C[0]), 0.0, 0
-        '''
+        sumA, sqA, cntA, sumB, sqB, cntB = stats.get(i, (np.zeros_like(C[0]), 0.0, 0, np.zeros_like(C[0]), 0.0, 0))
+
         alpha_i = cntA / NA if NA > 0 else 0.0
-        betha_i= cntB / NB if NB > 0 else 0.0
+        beta_i= cntB / NB if NB > 0 else 0.0
 
         mu_A_i = sumA / cntA if cntA > 0 else C[i]
         mu_B_i = sumB / cntB if cntB > 0 else C[i]
 
         alpha[i] = alpha_i
-        beta[i] = betha_i
+        beta[i] = beta_i
         
         muA[i] = mu_A_i
         muB[i] = mu_B_i
 
-        deltaA += sqA - cntA * C_squares[i]
-        deltaB += sqB - cntB * C_squares[i]
+        deltaA += sqA - cntA * np.dot(mu_A_i, mu_A_i)
+        deltaB += sqB - cntB * np.dot(mu_B_i, mu_B_i)
         
         ell[i] = float(np.linalg.norm(mu_A_i - mu_B_i))
 
@@ -119,7 +110,7 @@ def computeVectorX(fixed_a, fixed_b, alpha, beta, ell, k):
 # Function to compute new fair centroids for all clusters
 def centroid_selection(stats, NA, NB, C, K):
     alpha, beta, mu_A, mu_B, ell, deltaA, deltaB = compute_vectors(stats, NA, NB, C, K)
-    
+
     fixedA = deltaA / NA
     fixedB = deltaB / NB
 
@@ -178,39 +169,28 @@ def MRFairLloyd(inputPoints, K, M):
     # |A| and |B|
     NA = inputPoints.filter(lambda x: x[-1] == 'A').count()
     NB = inputPoints.filter(lambda x: x[-1] == 'B').count()
-    d  = len(C[0])
-    
-    for i in range(M):
+
+    for _ in range(M):
+        # Broadcast current C
         bc_cent = inputPoints.context.broadcast(C)
 
-        # Create zero-value per-partition | stats_list via treeAggregate
-        def make_zero_stats():
-            # returns a list of length K with zeroed stat tuples
-            zero = (np.zeros(d), 0.0, 0, np.zeros(d), 0.0, 0)
-            return [zero for _ in range(K)]
-
-        def seqOp(acc, point_group):
-            # accumulate each point into local acc stats list
-            idx, stat = map_stats(point_group, bc_cent.value)
-            acc[idx] = reduce_stats(acc[idx], stat)
-            return acc
-
-        def combOp(acc1, acc2):
-            # merge two partial stats lists elementwise
-            return [reduce_stats(acc1[j], acc2[j]) for j in range(K)]
-
-        stats_list = inputPoints.treeAggregate(
-            make_zero_stats(), seqOp, combOp, depth=3
+        #2.1 - Partition U into k clusters U1,U2,...,Uk where Ui consists of the points of U whose closest current centroid is ci
+        #stats: dict mapping cluster_idx -> (sumA, sumSqA, cntA, sumB, sumSqB, cntB)
+        stats = (
+            inputPoints
+            .map(lambda x: map_stats(x, bc_cent.value))
+            .reduceByKey(reduce_stats)
+            .collectAsMap()
         )
+        bc_cent.destroy()
 
-        # compute new centroids on driver
-        C = centroid_selection(stats_list, NA, NB, C, K)
-        bc_cent.destroy()       
-        
+        #2.2 - Compute a new set {c1, ..., ck} of K centroids
+        C = centroid_selection(stats, NA, NB, C, K)
 
     return [tuple(c.tolist()) for c in C]
 
 def main():
+
     #1 - Prints the command-line arguments and stores L,K,M into suitable variables.
     assert len(sys.argv) == 5, "Usage: python G97HW2.py <file_name> <L> <K> <M>"
     
