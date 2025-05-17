@@ -5,12 +5,6 @@ import random
 import csv
 import os
 
-'''
-The script G97GEN.py generates a synthetic 2D dataset of N points with demographic labels (A or B).
-The dataset is structured to highlight the quality gap between standard Lloyd's algorithm and its fair variant.
-It creates K-1 compact clusters for the majority group A, and a single wide-spread cluster for the minority group B.
-Points are printed and saved in CSV format (datasets/G97GEN.csv).
-'''
 
 def gen_dataset(N, K):
     output_file = os.path.join("datasets", "G97GEN.csv")
