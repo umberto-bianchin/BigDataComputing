@@ -44,7 +44,7 @@ if __name__ == '__main__':
     conf = SparkConf().setMaster("local[*]").setAppName("DistinctExample")
     # If you get an OutOfMemory error in the heap consider to increase the
     # executor and drivers heap space with the following lines:
-    conf = conf.set("spark.executor.memory", "4g").set("spark.driver.memory", "4g")
+    #conf = conf.set("spark.executor.memory", "4g").set("spark.driver.memory", "4g")
     
     
     # Here, with the duration you can control how large to make your batches.
