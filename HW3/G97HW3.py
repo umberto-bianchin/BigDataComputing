@@ -27,12 +27,10 @@ def process_batch(time, batch):
     # Extract the distinct items from the batch
     batch_items = batch.map(lambda s: (int(s), 1)).reduceByKey(lambda i1, i2: 1).collectAsMap()
 
-    # Update the streaming state
+    # Update the streaming state      
     for key in batch_items:
         histogram[key] += 1
-    
-    for key in batch_items:
-        conservative_count_min_sketch(key)
+        count_min_sketch(key)
         count_sketch(key)
     
     #if batch_size > 0:
@@ -45,18 +43,10 @@ def process_batch(time, batch):
 # ======================================================
 #           COUNT-MIN & COUNT SKETCH ESTIMATORS
 # ======================================================
-def conservative_count_min_sketch(key):
-    item_map = {}
-    columns = {}
-    for i, row in enumerate(countMin):
+def count_min_sketch(key):
+    for i, _ in enumerate(countMin):
         column = hash_compute(hashList[i], W, key)
-        columns[i] = column
-        item_map[i] = row[column]
-
-    min_value = min(item_map.values())
-    for map_key, value in item_map.items():
-        if value == min_value:
-            countMin[map_key][columns[map_key]] += 1
+        countMin[i][column] += 1
 
 
 def count_sketch(key):
@@ -184,6 +174,13 @@ if __name__ == "__main__":
 
     # PRINTINGS
     print(f"portExp = {portExp}, T = {T}, D = {D}, W = {W}, K = {K}")
+    print("Number of processed items =", streamLength[0])
     print("Number of distinct items =", len(histogram))
     print("Average Relative Error CM =", avg_relative_error_min)
     print("Average Relative Error CS =", avg_relative_error_sketch)
+
+    if K <= 10:
+        for num in topK:
+            estimated_frequency_min = estimate_frequency(num)
+            true_frequency = histogram[num]
+            print(f"Element {num}, real frequency {true_frequency}, estimated frequency {estimated_frequency_min}")
