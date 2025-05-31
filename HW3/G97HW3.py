@@ -24,14 +24,13 @@ def process_batch(time, batch):
         return
     
     streamLength[0] += batch_size
-    # Extract the distinct items from the batch
-    batch_items = batch.map(lambda s: (int(s), 1)).reduceByKey(lambda i1, i2: 1).collectAsMap()
 
-    # Update the streaming state      
-    for key in batch_items:
-        histogram[key] += 1
-        count_min_sketch(key)
-        count_sketch(key)
+    batch_items = batch.map(int).countByValue()   # dict {key: count}
+    for key, cnt in batch_items.items():
+        histogram[key] += cnt
+        for _ in range(cnt):
+            count_min_sketch(key)
+            count_sketch(key)
     
     #if batch_size > 0:
     #   print("Batch size at time [{0}] is: {1}".format(time, batch_size))
