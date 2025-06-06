@@ -14,15 +14,15 @@ p = 8191    # param p for hash functions
 # ======================================================
 #                STREAM BATCH PROCESSING
 # ======================================================
-def process_batch(time, batch):
+def process_batch(batch):
     # We are working on the batch at time `time`.
     global streamLength, histogram
     batch_size = batch.count()
 
-    # If we already have enough points (> THRESHOLD), skip this batch.
-    if streamLength[0]>=T:
+    # If the batch is empty or we already have enough points (> THRESHOLD), skip this batch.
+    if batch_size == 0 or streamLength[0]>=T:
         return
-    
+
     streamLength[0] += batch_size
 
     batch_items = batch.map(int).countByValue()   # dict {key: count}
@@ -31,9 +31,6 @@ def process_batch(time, batch):
         for _ in range(cnt):
             count_min_sketch(key)
             count_sketch(key)
-    
-    #if batch_size > 0:
-    #   print("Batch size at time [{0}] is: {1}".format(time, batch_size))
 
     if streamLength[0] >= T:
         stopping_condition.set()
@@ -142,16 +139,11 @@ if __name__ == "__main__":
     hashList2D = [[hash_function(), hash_function()] for _ in range(D)]
 
     stream = ssc.socketTextStream("algo.dei.unipd.it", portExp, StorageLevel.MEMORY_AND_DISK)
-    stream.foreachRDD(lambda time, batch: process_batch(time, batch))
+    stream.foreachRDD(lambda batch: process_batch(batch))
     
-    #print("Starting streaming engine")
     ssc.start()
-    #print("Waiting for shutdown condition")
     stopping_condition.wait()
-    #print("Stopping the streaming engine")
-
     ssc.stop(False, False)
-    #print("Streaming engine stopped")
 
     # COMPUTE AND PRINT FINAL STATISTICS
     topK = heavy_hitters()
@@ -181,7 +173,7 @@ if __name__ == "__main__":
 
     if K <= 10:
         print("Top-K Heavy Hitters:")
-        for num in topK:
+        for num in sorted(topK):
             estimated_frequency_min = estimate_frequency(num)
             true_frequency = histogram[num]
             print(f"Item {num} True frequency = {true_frequency} Estimated frequency with CM = {estimated_frequency_min}")
