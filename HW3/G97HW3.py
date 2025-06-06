@@ -43,7 +43,7 @@ def process_batch(time, batch):
 #           COUNT-MIN & COUNT SKETCH ESTIMATORS
 # ======================================================
 def count_min_sketch(key):
-    for i, _ in enumerate(countMin):
+    for i in range(D):
         column = hash_compute(hashList[i], W, key)
         countMin[i][column] += 1
 
@@ -172,14 +172,16 @@ if __name__ == "__main__":
     avg_relative_error_sketch = relative_errors_sketch / len(topK)
 
     # PRINTINGS
-    print(f"portExp = {portExp}, T = {T}, D = {D}, W = {W}, K = {K}")
+    print(f"Port = {portExp} T = {T} D = {D} W = {W} K = {K}")
     print("Number of processed items =", streamLength[0])
     print("Number of distinct items =", len(histogram))
-    print("Average Relative Error CM =", avg_relative_error_min)
-    print("Average Relative Error CS =", avg_relative_error_sketch)
+    print("Number of Top-K Heavy Hitters = ", len(topK))
+    print("Avg Relative Error for Top-K Heavy Hitters with CM =", avg_relative_error_min)
+    print("Avg Relative Error for Top-K Heavy Hitters with CS =", avg_relative_error_sketch)
 
     if K <= 10:
+        print("Top-K Heavy Hitters:")
         for num in topK:
             estimated_frequency_min = estimate_frequency(num)
             true_frequency = histogram[num]
-            print(f"Element {num}, real frequency {true_frequency}, estimated frequency {estimated_frequency_min}")
+            print(f"Item {num} True frequency = {true_frequency} Estimated frequency with CM = {estimated_frequency_min}")
