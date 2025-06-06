@@ -129,7 +129,7 @@ if __name__ == "__main__":
 
     stopping_condition = threading.Event()
 
-    rn.seed(SEED)   # setting the seed for reproducibility
+    #rn.seed(SEED)   # setting the seed for reproducibility
 
     streamLength = [0]
     histogram = defaultdict(int)
